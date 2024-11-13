@@ -19,6 +19,8 @@ __all__ = (
     "C1",
     "C2",
     "C3",
+    "ChannelAttention",
+    "C2fCA",
     "C2f",
     "C2fAttn",
     "ImagePoolingAttn",
@@ -222,23 +224,20 @@ class C2(nn.Module):
 
 # Define the CA block for Channel Attention
 class ChannelAttention(nn.Module):
-    def __init__(self, channel, reduction=16):
+    def __init__(self, in_channels, reduction_ratio=16):
         super(ChannelAttention, self).__init__()
-        self.avg_pool = nn.AdaptiveAvgPool2d(1)  # Global average pooling
-        self.fc1 = nn.Conv2d(channel, channel // reduction, kernel_size=1, bias=False)
-        self.relu = nn.ReLU()
-        self.fc2 = nn.Conv2d(channel // reduction, channel, kernel_size=1, bias=False)
+        self.avg_pool = nn.AdaptiveAvgPool2d(1)
+        self.fc1 = nn.Conv2d(in_channels, in_channels // reduction_ratio, 1, bias=False)
+        self.relu = nn.ReLU(inplace=True)
+        self.fc2 = nn.Conv2d(in_channels // reduction_ratio, in_channels, 1, bias=False)
         self.sigmoid = nn.Sigmoid()
 
     def forward(self, x):
-        # Global average pooling
-        y = self.avg_pool(x)
-        # Apply fully connected layers
-        y = self.fc1(y)
-        y = self.relu(y)
-        y = self.fc2(y)
-        # Channel-wise multiplication
-        return x * self.sigmoid(y)
+        y = self.avg_pool(x)  # Output shape is (B, C, 1, 1)
+        y = self.relu(self.fc1(y))  # Shape is (B, C // reduction_ratio, 1, 1)
+        y = self.sigmoid(self.fc2(y))  # Shape is (B, C, 1, 1)
+        return x * y  # Apply channel attention
+
     
 class C2fCA(nn.Module):
     """Faster Implementation of CSP Bottleneck with 2 convolutions with CA."""
@@ -248,7 +247,7 @@ class C2fCA(nn.Module):
         super().__init__()
         self.c = int(c2 * e)  # hidden channels
         self.cv1 = Conv(c1, 2 * self.c, 1, 1)
-        self.ca1 = ChannelAttention(2 * self.c)  # CA only after cv1
+        self.ca1 = ChannelAttention(self.c)  # CA only after cv1
         self.cv2 = Conv((2 + n) * self.c, c2, 1)  # optional act=FReLU(c2)
         self.ca2 = ChannelAttention(c2)  # CA only after cv2
         self.m = nn.ModuleList(Bottleneck(self.c, self.c, shortcut, g, k=((3, 3), (3, 3)), e=1.0) for _ in range(n))
