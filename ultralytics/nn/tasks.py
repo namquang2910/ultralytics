@@ -27,6 +27,8 @@ from ultralytics.nn.modules import (
     ADown,
     Bottleneck,
     BottleneckCSP,
+    ChannelAttention,
+    C2fCA,
     C2f,
     C2fAttn,
     C2fCIB,
@@ -128,7 +130,7 @@ class BaseModel(nn.Module):
         if augment:
             return self._predict_augment(x)
         return self._predict_once(x, profile, visualize, embed)
-
+ 
     def _predict_once(self, x, profile=False, visualize=False, embed=None):
         """
         Perform a forward pass through the network.
@@ -957,7 +959,7 @@ def parse_model(d, ch, verbose=True):  # model_dict, input_channels(3)
     ch = [ch]
     layers, save, c2 = [], [], ch[-1]  # layers, savelist, ch out
     for i, (f, n, m, args) in enumerate(d["backbone"] + d["head"]):  # from, number, module, args
-        m = getattr(torch.nn, m[3:]) if "nn." in m else globals()[m]  # get module
+        m = getattr(torch.nn, m[3:]) if "nn." in m else globals()[m]  # get module thu thoi
         for j, a in enumerate(args):
             if isinstance(a, str):
                 try:
@@ -988,6 +990,8 @@ def parse_model(d, ch, verbose=True):  # model_dict, input_channels(3)
             ADown,
             AConv,
             SPPELAN,
+            ChannelAttention,
+            C2fCA,
             C2fAttn,
             C3,
             C3TR,
@@ -1015,6 +1019,7 @@ def parse_model(d, ch, verbose=True):  # model_dict, input_channels(3)
                 C1,
                 C2,
                 C2f,
+                C2fCA,
                 C3k2,
                 C2fAttn,
                 C3,
